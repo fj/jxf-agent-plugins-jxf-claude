@@ -1,0 +1,45 @@
+---
+description: Make the next PR from work performed this session, or from the oldest unmerged branch
+---
+
+Create the next pull request:
+
+$ARGUMENTS
+
+## Preflight
+
+1. Verify you are inside a git repository (`git rev-parse --is-inside-work-tree`); refuse to proceed otherwise.
+2. Verify a remote exists and `gh` is authenticated (`git remote -v`, `gh auth status`). If either is missing, tell the user what's needed and stop.
+3. Run `git status` — if there is uncommitted work that belongs in this PR, surface it and ask whether to commit it first rather than silently leaving it behind.
+4. Start from the latest: `git fetch` the remote so the branch is reviewed and rebased against the current default-branch tip.
+
+## Choose what to PR
+
+Work down this list and use the first that applies:
+
+1. **Specific instructions above** — if the user named a branch, commits, or a body of work, PR exactly that.
+2. **Work performed this session** — if this conversation produced commits or a branch, PR that work. Identify it from the session's own history (branches created, commits made), not by guessing from `git log`.
+3. **Oldest unmerged branch** — otherwise, find local branches not merged into the default branch (`git branch --no-merged <default>`), excluding the default branch itself and any `agent/*` scratch branches (never a direct PR candidate — see below). Pick the one whose first unmerged commit is oldest (`git log --reverse <default>..<branch>`). If there are none, report that there's nothing to PR and stop.
+
+If the chosen work sits only on the default branch (e.g., merged topic branches or direct commits) and the remote default branch is behind, create a branch from the local default branch containing those commits and PR that — never PR by pushing the default branch itself.
+
+**Never push an `agent/*` branch.** Those are local scratch left by `/jxf:coding:develop`. If the chosen work lives on an `agent/*` branch, create a `topic/*` branch from its commits (`git switch -c topic/<slug> agent/<name>`) and PR that instead. A global `pre-push` hook rejects `agent/*` pushes as a backstop.
+
+## Make the PR
+
+1. **Gate on unresolved findings.** Establish that the chosen branch's high-severity review findings were fixed and re-verified. If any are outstanding, or you cannot establish the branch's resolution state at all — no review covered it in this session, or its review failed — do not open the PR. Show the user what is unresolved or unknown and stop, so they can resolve it (`/jxf:coding:review`) or tell you explicitly to accept it and proceed. Never treat "no findings recorded" as "no findings". A branch stacked on a blocked branch is blocked too, since its PR would carry the base branch's unresolved commits.
+2. Ensure the branch is rebased on (or at least cleanly mergeable into) the latest remote default branch; rebase if needed and safe (never rewrite commits that are already on the remote).
+3. Push the branch to the remote with an upstream (`git push -u origin <branch>`). If the branch is an `agent/*` branch, stop and move the work onto a `topic/*` branch first (see above).
+4. Review **all** commits the PR will contain (`git log` and `git diff <default>...<branch>`), not just the latest commit.
+5. Create the PR with `gh pr create`:
+   - Title: concise summary of the change (imperative mood).
+   - Body: a short "## Summary" (what and why, 1-3 bullets) and a "## Test plan" describing how the change was or should be verified.
+   - Target the repository's default branch unless instructed otherwise.
+6. Do not enable auto-merge, request reviewers, or merge the PR unless asked.
+
+## Report
+
+- State which selection rule applied (instructions / session work / oldest unmerged branch) and why.
+- If the unresolved-findings gate blocked the PR, report it as blocked: name the branch, list what is unresolved or unknown, state that no PR was created, and skip the PR-specific items below.
+- Include the PR URL, the branch name, and the commits it contains.
+- Note anything left out (uncommitted files, other unmerged branches still awaiting PRs).
